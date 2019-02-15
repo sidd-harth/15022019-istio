@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: payment-mirror
+spec:
+  hosts:
+  - payment
+  http:
+  - route:
+    - destination:
+        host: payment
+        subset: version-v1
+    mirror:
+      host: payment
+      subset: version-v2
+---

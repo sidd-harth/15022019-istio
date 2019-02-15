@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: payment-v4-503
+spec:
+  hosts:
+  - payment
+  http:
+  - fault:
+      abort:
+        httpStatus: 503
+        percent: 100
+    route:
+    - destination:
+        host: payment
+        subset: version-v4
+---
