@@ -12,17 +12,17 @@ oc login -u system:admin
 oc apply -f https://raw.githubusercontent.com/istio/istio/1.0.2/install/kubernetes/helm/istio/templates/crds.yaml
 
 echo "initilizing the environment with apigee's istio and adapter"
-mkdir apigee   &&
-cd apigee  &&
+mkdir aio   &&
+cd aio  &&
 wget https://github.com/apigee/istio-mixer-adapter/releases/download/1.0.5/istio-mixer-adapter_1.0.5_linux_64-bit.tar.gz &&
 tar -xvzf istio-mixer-adapter_1.0.5_linux_64-bit.tar.gz &&
 oc  apply -f samples/istio/istio-demo.yaml  &&
-export PATH=$PATH:/root/installation/apigee/  &&
+export PATH=$PATH:/root/installation/aio/  &&
 apigee-istio version  &&
 apigee-istio provision -f -o mamillarevathi-eval -e test -u mamilla.revathi@tavant.com -p Qwerty@67 > samples/apigee/handler.yaml &&
-oc new-project apigee  &&
-oc adm policy add-scc-to-user privileged -z default -n apigee  &&
-oc label  namespace apigee istio-injection=enabled  &&
+oc new-project aio  &&
+oc adm policy add-scc-to-user privileged -z default -n aio  &&
+oc label  namespace aio istio-injection=enabled  &&
 oc get pods -w -n istio-system
 
 
@@ -43,7 +43,7 @@ oc apply -f samples/apigee/handler.yaml
 
 #change the match operator to only add the rule to movies svc endpoint
 spec:
-  match: destination.service == "movies.apigee.svc.cluster.local"
+  match: destination.service == "movies.aio.svc.cluster.local"
   
 oc apply -f samples/apigee/rule.yaml
 
