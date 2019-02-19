@@ -9,7 +9,7 @@ spec:
   http:
   - fault:
       abort:
-        httpStatus: 503
+        httpStatus: 401
         percent: 50
     route:
     - destination:
