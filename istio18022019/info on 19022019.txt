@@ -1,0 +1,363 @@
+Simple Routing
+	v1 v2 - round robin
+	all calls to one version
+	Canary deployment: Split traffic between v1 and v2 - 90 10 - 75 25 - 50 50 - 0 100
+		oc apply -f destination-rule-movies-v1-v2.yml
+		oc apply -f virtual-service-movies-v1_100.yml
+		oc apply -f ../kubernetes/kube-injected/movies-v2-deployment-injected.yml -n aio
+
+		oc replace -f virtual-service-movies-v1_and_v2_10_90.yml
+		oc replace -f virtual-service-movies-v1_and_v2_50_50.yml
+		oc replace -f virtual-service-movies-v2_100.yml
+
+		oc scale deployment movies-v1 --replicas=0 -n aio
+	
+Advacned Routing
+		oc apply -f ../kubernetes/kube-injected/payment-v2-deployment-injected.yml -n aio
+
+	Mirroring Traffic (Dark Launch) 
+		oc apply -f destination-rule-payment-v1-v2.yml
+		oc apply -f virtual-service-payment-v1-mirror-v2.yml
+		oc logs -f $(oc get pods|grep payment-v2|awk '{ print $1 }') -c payment
+	
+	user-agent header (Canary Deployment)
+		oc replace -f virtual-service-firefox-payment-v2.yml
+		while true; do  curl http://movies-aio.2886795272-80-kitek03.environments.katacoda.com; sleep .5; done
+		oc delete destinationrule payment && oc delete virtualservice payment
+
+	Load Balancer (multiple replicas and random load balancing)
+		oc delete destinationrule payment && oc delete virtualservice payment
+		oc scale deployment payment-v2 --replicas=3 -n aio
+		oc scale deployment payment-v1 --replicas=2 -n aio
+		while true; do  curl http://movies-aio.2886795272-80-kitek03.environments.katacoda.com; sleep .5; done
+
+		oc scale deployment payment-v2 --replicas=1 -n aio
+		oc scale deployment payment-v1 --replicas=1 -n aio
+		while true; do  curl http://movies-aio.2886795272-80-kitek03.environments.katacoda.com; sleep .5; done
+		oc delete destinationrule payment
+
+	xxxRate Limiting (use apigeee quota)
+	
+Fault Injection
+	HTTP Error 503
+		oc apply -f fi-destination-rule-payment.yml
+		oc apply -f fi-virtual-service-payment-401.yml
+		oc delete -f fi-virtual-service-payment-401.yml
+
+	Delay
+	Retry 
+		- oc exec -it $(oc get pods|grep recommendation-v2|awk '{ print $1 }'|head -1) -c recommendation /bin/bash
+		- curl localhost:8080/misbehave
+		- while true; do time curl http://customer-tutorial.2886795268-80-kitek03.environments.katacoda.com; sleep .5; done
+		- while true; do  curl http://customer-tutorial.2886795268-80-kitek03.environments.katacoda.com; sleep .5; done
+	Timeout
+
+
+Fault Injection
+	HTTP Error 503
+		oc apply -f fi-destination-rule-payment.yml
+		oc apply -f fi-virtual-service-payment-401.yml
+		oc delete -f fi-virtual-service-payment-401.yml
+		
+Circuit Breaker (only requires Destination Rules)
+	Siege
+		wget -c https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/s/siege-4.0.2-2.el7.x86_64.rpm https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/l/libjoedog-0.1.2-1.el7.x86_64.rpm -P installation/
+		rpm -ivh installation/*.rpm
+	
+	Delay and CiruitBreaker
+	Fail Fast with Max Connections & Max Pending Requests
+			while true; do  curl http://movies-aio.2886795279-80-kitek03.environments.katacoda.com; sleep .5; done
+		oc replace -f fi-virtual-service-payment-delay.yml
+			while true; do time curl http://movies.com; sleep .5; done
+			siege -r 5 -c 5 -v movies-aio.2886795279-80-kitek03.environments.katacoda.com
+		oc replace -f fi-destination-rule-payment_cb_policy.yml
+		siege -r 5 -c 5 -v movies.com
+		oc delete destinationrule payment && oc delete virtualservice payment
+
+	Pool Ejection
+	Ultimate resilience with retries, circuit breaker, and pool ejection
+		oc scale deployment payment-v2 --replicas=2 -n aio
+
+		oc apply -f cpr-destination-rule-payment-v1-v2.yml
+		oc apply -f cpr-virtual-service-payment-v1_and_v2_50_50.yml
+		while true; do  curl http://movies-aio.2886795279-80-kitek03.environments.katacoda.com; sleep .5; done
+
+		oc exec -it $(oc get pods|grep payment-v2|awk '{ print $1 }'|head -1) -c payment /bin/bash
+		curl localhost:8080/misbehave
+		exit
+		while true; do  curl http://movies.com; sleep .5; done
+
+		oc replace -f cpr-destination-rule-payment_pool_ejection.yml
+		while true; do  curl http://movies.com; sleep .5; done
+		oc replace -f cpr-virtual-service-payment_retry.yml
+		while true; do  curl http://movies.com; sleep .5; done
+
+
+
+		oc expose svc istio-ingressgateway -n istio-system; \
+> oc expose svc servicegraph -n istio-system; \
+> oc expose svc grafana -n istio-system; \
+> oc expose svc prometheus -n istio-system; \
+> oc expose svc tracing -n istio-system
+
+
+KIALIIIII
+
+Define URLS for Jaeger and Grafana
+export JAEGER_URL="https://tracing-istio-system.2886795279-80-kitek03.environments.katacoda.com"; \
+export GRAFANA_URL="https://grafana-istio-system.2886795279-80-kitek03.environments.katacoda.com"; \
+export VERSION_LABEL="v0.9.0"
+
+Install Kiali's configmap
+curl https://raw.githubusercontent.com/kiali/kiali/${VERSION_LABEL}/deploy/openshift/kiali-configmap.yaml | \
+  VERSION_LABEL=${VERSION_LABEL} \
+  JAEGER_URL=${JAEGER_URL}  \
+  GRAFANA_URL=${GRAFANA_URL} envsubst | oc create -n istio-system -f -
+
+Install Kiali's secrets
+curl https://raw.githubusercontent.com/kiali/kiali/${VERSION_LABEL}/deploy/openshift/kiali-secrets.yaml | \
+  VERSION_LABEL=${VERSION_LABEL} envsubst | oc create -n istio-system -f -
+
+Deploy Kiali to the cluster
+curl https://raw.githubusercontent.com/kiali/kiali/${VERSION_LABEL}/deploy/openshift/kiali.yaml | \
+  VERSION_LABEL=${VERSION_LABEL}  \
+  IMAGE_NAME=kiali/kiali \
+  IMAGE_VERSION=${VERSION_LABEL}  \
+  NAMESPACE=istio-system  \
+  VERBOSE_MODE=4  \
+  IMAGE_PULL_POLICY_TOKEN="imagePullPolicy: Always" envsubst | oc create -n istio-system -f -
+
+Create a new Route for the port 443
+(oc get route kiali -n istio-system -o json|sed 's/80/443/')|oc apply -n istio-system -f -
+
+
+admin/admin password
+
+
+
+
+
+
+
+
+
+===========
+add namespace to all istio files
+change project names in scriptsssss *****************
+
+try pool ejection with cb config in http and tcp
+try cb alone on v2 payment with istio delay
+
+======
+
+add isztio delay to both versions
+and use cb rule on both version
+then use seige
+
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  creationTimestamp: null
+  name: payment
+  namespace: tutorial
+spec:
+  host: payment
+  subsets:
+  - labels:
+      app: payment
+    name: app-payment
+    trafficPolicy:
+        connectionPool:
+          http:
+            http1MaxPendingRequests: 1
+            maxRequestsPerConnection: 1
+          tcp:
+            maxConnections: 1
+        outlierDetection:
+          baseEjectionTime: 120.000s
+          consecutiveErrors: 1
+          interval: 1.000s
+          maxEjectionPercent: 100
+
+
+===
+
+
+
+while true; do curl movies-apigee.2886795270-80-kitek03.environments.katacoda.com ; sleep .2; done
+
+oc exec -it $(oc get pods|grep payment-v2|awk '{ print $1 }'|head -1) -c payment /bin/bash
+
+
+siege -r 2 -c 20 -v movies-apigee.2886795268-80-kitek03.environments.katacoda.com
+
+docker push siddharth67/hello:v9
+docker run -d -p 8080:80 siddharth67/hello:v9
+
+FOR circuit breaker and showing cocncurrent calls to slow services will get 503,
+
+
+use 
+desti - v1 v2
+virtu - v1 50 v2 50
+show seige all 200
+change dest to sbelow
+show seige 503
+
+replace
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: payment
+  namespace: apigee
+spec:
+  host: payment
+  subsets:
+    - name: version-v1
+      labels:
+        version: v1
+    - name: version-v2
+      labels:
+        version: v2
+      trafficPolicy:
+        connectionPool:
+          http:
+            http1MaxPendingRequests: 1
+            maxRequestsPerConnection: 1
+          tcp:
+            maxConnections: 1
+        outlierDetection:
+          baseEjectionTime: 120.000s
+          consecutiveErrors: 1
+          interval: 1.000s
+          maxEjectionPercent: 100
+
+
+
+
+
+.///////////////////////pool ejection and retry////////////
+oc scale deployment payment-v2 --replicas=2 -n apigee
+
+while true; do curl movies-apigee.2886795279-80-kitek03.environments.katacoda.com ; sleep .2; done
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: payment
+  namespace: apigee
+spec:
+  host: payment
+  subsets:
+  - labels:
+      version: v1
+    name: version-v1
+  - labels:
+      version: v2
+    name: version-v2
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: payment
+  namespace: apigee
+spec:
+	  hosts:
+	  - payment
+	  http:
+	  - route:
+	    - destination:
+	        host: payment
+	        subset: version-v1
+	      weight: 50
+	    - destination:
+	        host: payment
+	        subset: version-v2
+	      weight: 50
+	---
+
+oc exec -it $(oc get pods|grep payment-v2|awk '{ print $1 }'|head -1) -c payment /bin/bash
+curl localhost:8080/misbehave
+exit
+
+while true; do curl movies-apigee.2886795279-80-kitek03.environments.katacoda.com ; sleep .2; done
+
+----
+
+replace destination rule
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  creationTimestamp: null
+  name: payment
+  namespace: apigee
+spec:
+  host: payment
+  subsets:
+  - labels:
+      version: v1
+    name: version-v1
+    trafficPolicy:
+      connectionPool:
+        http: {}
+        tcp: {}
+      loadBalancer:
+        simple: RANDOM
+      outlierDetection:
+        baseEjectionTime: 5.000s
+        consecutiveErrors: 1
+        interval: 5.000s
+        maxEjectionPercent: 100
+  - labels:
+      version: v2
+    name: version-v2
+    trafficPolicy:
+      connectionPool:
+        http: {}
+        tcp: {}
+      loadBalancer:
+        simple: RANDOM
+      outlierDetection:
+        baseEjectionTime: 5.000s
+        consecutiveErrors: 1
+        interval: 5.000s
+        maxEjectionPercent: 100
+---
+
+
+replace virtual service
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: payment
+  namespace: apigee
+spec:
+  hosts:
+  - payment
+  http:
+  - retries:
+      attempts: 3
+      perTryTimeout: 4.000s
+    route:
+    - destination:
+        host: payment
+        subset: version-v1
+      weight: 50
+    - destination:
+        host: payment
+        subset: version-v2
+      weight: 50
+---
+
+
+
+
+
+
+
+.///////////////////////pool ejection and retry////////////
