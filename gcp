@@ -1,0 +1,97 @@
+ sudo yum install -y yum-utils \
+  device-mapper-persistent-data \
+  lvm2
+
+sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+
+sudo yum install docker-ce docker-ce-cli containerd.io
+
+sudo systemctl start docker
+sudo docker run hello-world
+
+/etc/docker/daemon.json
+{
+   "insecure-registries": [
+     "172.30.0.0/16"
+   ]
+} 
+
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+docker network inspect -f "{{range .IPAM.Config }}{{ .Subnet }}{{end}}" bridge
+You should get a subnet like: 172.17.0.0/16
+
+sudo firewall-cmd --permanent --new-zone dockerc
+sudo firewall-cmd --permanent --zone dockerc --add-source 172.17.0.0/16
+sudo firewall-cmd --permanent --zone dockerc --add-port 8443/tcp
+sudo firewall-cmd --permanent --zone dockerc --add-port 53/udp
+sudo firewall-cmd --permanent --zone dockerc --add-port 8053/udp
+sudo firewall-cmd --reload
+
+yum install -y wget
+https://github.com/openshift/origin/releases/download/v3.10.0/openshift-origin-client-tools-v3.10.0-dd10d17-linux-64bit.tar.gz
+tar -xvzf openshift-origin-client-tools-v3.10.0-dd10d17-linux-64bit.tar.gz
+export PATH=$(pwd):$PATH
+
+/*
+metadata_endpoint="http://35.200.184.230"
+public_hostname="$( curl "${metadata_endpoint}")"
+public_ip="$( curl "${metadata_endpoint}" )"
+oc cluster up --public-hostname="${public_hostname}" --routing-suffix="${public_ip}.nip.io" */
+
+
+
+oc cluster up --write-config
+
+# Enable admission webhooks
+sed -i -e 's/"admissionConfig":{"pluginConfig":null}/"admissionConfig": {\
+    "pluginConfig": {\
+        "ValidatingAdmissionWebhook": {\
+            "configuration": {\
+                "apiVersion": "v1",\
+                "kind": "DefaultAdmissionConfig",\
+                "disable": false\
+            }\
+        },\
+        "MutatingAdmissionWebhook": {\
+            "configuration": {\
+                "apiVersion": "v1",\
+                "kind": "DefaultAdmissionConfig",\
+                "disable": false\
+            }\
+        }\
+    }\
+}/' openshift.local.clusterup/kube-apiserver/master-config.yaml
+
+oc cluster up --server-loglevel=5
+
+oc login -u system:admin
+
+oc adm policy add-scc-to-user anyuid -z istio-ingress-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z default -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z prometheus -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-egressgateway-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-citadel-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-ingressgateway-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-cleanup-old-ca-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-mixer-post-install-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-mixer-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-pilot-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z istio-sidecar-injector-service-account -n istio-system &&
+oc adm policy add-cluster-role-to-user cluster-admin -z istio-galley-service-account -n istio-system &&
+oc adm policy add-scc-to-user anyuid -z cluster-local-gateway-service-account -n istio-system
+
+
+
+routingConfig:
+  subdomain: 2886795291-80-kitek03.environments.katacoda.com
+ corsAllowedOrigins:
+- (?i)//2886795291\-8443\-kitek03\.environments\.katacoda\.com(:|\z)
+
+masterPublicURL: https://2886795291-8443-kitek03.environments.katacoda.com:443
+oauthConfig:
+  assetPublicURL: https://2886795291-8443-kitek03.environments.katacoda.com:443/console/
+    masterPublicURL: https://2886795291-8443-kitek03.environments.katacoda.com:443
