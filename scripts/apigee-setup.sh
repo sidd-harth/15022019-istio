@@ -4,8 +4,9 @@ oc login -u system:admin
 wget https://github.com/istio/istio/releases/download/1.0.2/istio-1.0.2-linux.tar.gz
 tar -xvzf istio-1.0.2-linux.tar.gz
 oc apply -f istio-1.0.2/install/kubernetes/helm/istio/templates/crds.yaml
-export PATH=$PATH:/root/installation/istio-1.0.2/bin/
-istioctl version
+export PATH=$PATH:$(pwd)/istio-1.0.2/bin/
+istioctl version 
+oc apply -f istio-1.0.2/install/kubernetes/istio-demo.yaml
 
 echo "download directly from raw github istio 1.0.2"
 oc login -u system:admin
@@ -17,7 +18,7 @@ cd aio  &&
 wget https://github.com/apigee/istio-mixer-adapter/releases/download/1.0.5/istio-mixer-adapter_1.0.5_linux_64-bit.tar.gz &&
 tar -xvzf istio-mixer-adapter_1.0.5_linux_64-bit.tar.gz &&
 oc  apply -f samples/istio/istio-demo.yaml  &&
-export PATH=$PATH:/root/installation/aio/  &&
+export PATH=$PATH:$(pwd)/aio/  &&
 apigee-istio version  &&
 apigee-istio provision -f -o mamillarevathi-eval -e test -u mamilla.revathi@tavant.com -p Qwerty@67 > samples/apigee/handler.yaml &&
 oc new-project aio  &&
